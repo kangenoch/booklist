@@ -72,7 +72,27 @@ namespace '/api/v1' do
         halt 400, { message:'Invalid JSON' }.to_json
       end
     end
+
+    # Using a method to access the book can save us
+    # from a lot of repetitions and can be used
+    # anywhere in the endpoints during the same
+    # request
+    def book
+      @book ||= Book.where(id: params[:id]).first
+    end
+
+    # Since we used this code in both show and update
+    # extracting it to a method make it easier and
+    # less redundant
+    def halt_if_not_found!
+      halt(404, { message:'Book Not Found'}.to_json) unless book
+    end
+
+    def serialize(book)
+      BookSerializer.new(book).to_json
+    end
   end
+
 
   get '/books' do
     books = Book.all
@@ -86,35 +106,49 @@ namespace '/api/v1' do
   end
 
   get '/books/:id' do |id|
-    book = Book.where(id: id).first
-    halt(404, { message:'Book Not Found'}.to_json) unless book
-    BookSerializer.new(book).to_json
+    #book = Book.where(id: id).first
+    #halt(404, { message:'Book Not Found'}.to_json) unless book
+    #BookSerializer.new(book).to_json
+    halt_if_not_found!
+    serialize(book)
   end
+
+
+  # We switched from an if...else statement
+  # to using a guard clause which is much easier
+  # to read and makes the flow more logical
 
   post '/books' do
     book = Book.new(json_params)
-    if book.save
-      response.headers['Location'] = "#{base_url}/api/v1/books/#{book.id}"
-      status 201
-    else
-      status 422
-      body BookSerializer.new(book).to_json
-    end
+    halt 422, serialize(book) unless book.save
+
+    
+    response.headers['Location'] = "#{base_url}/api/v1/books/#{book.id}"
+    status 201
+
   end
 
+  # Just like for the create endpoint,
+  # we switched to a guard clause style to
+  # check if the book is not found or if
+  # the data is not valid
+
   patch '/books/:id' do |id|
-    book = Book.where(id: id).first
-    halt(404, { message:'Book Not Found'}.to_json) unless book
-    if book.update_attributes(json_params)
-      BookSerializer.new(book).to_json
-    else
-      status 422
-      body BookSerializer.new(book).to_json
-    end
+    #book = Book.where(id: id).first
+    #halt(404, { message:'Book Not Found'}.to_json) unless book
+    #if book.update_attributes(json_params)
+    #  BookSerializer.new(book).to_json
+    #else
+    #  status 422
+    #  body BookSerializer.new(book).to_json
+    #end
+    halt_if_not_found!
+    halt 422, serialize(book) unless book.update_attributes(json_params)
+    serialize(book)
   end
 
   delete '/books/:id' do |id|
-    book = Book.where(id: id).first
+    #book = Book.where(id: id).first
     book.destroy if book
     status 204
   end
